@@ -56,7 +56,7 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
 
 
 ## Load the news data
-A = np.genfromtxt('./data/news.csv', delimiter=',', skip_header=1)
+A = np.genfromtxt('news.csv', delimiter=',', skip_header=1)
 ## To read the terms, just read the first line of news.csv
 with open('./data/news.csv') as f:
     header = f.readline()
@@ -65,12 +65,13 @@ with open('./data/news.csv') as f:
 ## Sample use of nmf_als with A
 (W, H, errs) = nmf(A, 20, optFunc=nmf_als, maxiter=300, repetitions=1)
 ## To show the per-iteration error
+'''
 plt.plot(errs)
 plt.xlabel('Iterations')
 plt.ylabel('Squared Frobenius')
 plt.title('Convergence of NMF ALS')
 plt.show()
-
+'''
 ## IMPLEMENT the other algorithms
 ## DO the comparisons
 
