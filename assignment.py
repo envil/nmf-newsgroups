@@ -2,8 +2,8 @@
 ## Winter 2019
 ## Assignment file
 ## FILL IN the following information
-## Name:
-## Student ID:
+## Name: Viet Ta
+## Student ID: 299954
 
 ##
 ## This file contains stubs of code to help you to do your 
@@ -56,9 +56,9 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
 
 
 ## Load the news data
-A = np.genfromtxt('news.csv', delimiter=',', skip_header=1)
+A = np.genfromtxt('./data/news.csv', delimiter=',', skip_header=1)
 ## To read the terms, just read the first line of news.csv
-with open('news.csv') as f:
+with open('./data/news.csv') as f:
     header = f.readline()
     terms = [x.strip('"\n') for x in header.split(',')]
 
