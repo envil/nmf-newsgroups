@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from scipy.stats import zscore
 
+
 ## In python, we can just write the code and it'll get called when the file is
 ## run with python3 assignment.py
 
@@ -37,6 +38,7 @@ def nmf_als(A, W, H):
     W[W < 0] = 0
     return (W, H)
 
+
 ## Boilerplate for NMF
 def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
     (n, m) = A.shape
@@ -48,7 +50,7 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
         errs = [np.nan] * maxiter
         for i in range(maxiter):
             (W, H) = optFunc(A, W, H)
-            currErr = norm(A - np.matmul(W, H), 'fro')**2
+            currErr = norm(A - np.matmul(W, H), 'fro') ** 2
             errs[i] = currErr
         if currErr < bestErr:
             bestErr = currErr
@@ -56,8 +58,6 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
             bestH = H
             bestErrs = errs
     return (bestW, bestH, bestErrs)
-
-
 
 
 ## Load the news data
