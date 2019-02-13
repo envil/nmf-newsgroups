@@ -40,6 +40,15 @@ def nmf_als(A, w, h):
     return w, h
 
 
+def nmf_lns(A, w, h):
+    h_denominator = np.matmul(np.matmul(np.transpose(w), w), h) + np.finfo(float).eps
+    h = h * np.matmul(np.transpose(w), A) / h_denominator
+    w_demoninator = np.matmul(np.matmul(w, h), np.transpose(h)) + np.finfo(float).eps
+    w = w * np.matmul(A, np.transpose(h)) / w_demoninator
+    w = w / np.sum(w)
+    return w, h
+
+
 ## Boilerplate for NMF
 def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
     (n, m) = A.shape
