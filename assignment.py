@@ -29,14 +29,15 @@ from scipy.stats import zscore
 ## Task 1
 ##########
 
+
 # Function that updates W and H using ALS
-def nmf_als(A, W, H):
+def nmf_als(A, w, h):
     # ADD YOUR code to update W and H
-    H = np.matmul(linalg.pinv(W), A)
-    H[H < 0] = 0
-    W = np.matmul(A, linalg.pinv(H))
-    W[W < 0] = 0
-    return (W, H)
+    h = np.matmul(linalg.pinv(w), A)
+    h[h < 0] = 0
+    w = np.matmul(A, linalg.pinv(h))
+    w[w < 0] = 0
+    return w, h
 
 
 ## Boilerplate for NMF
@@ -68,7 +69,7 @@ with open('news.csv') as f:
     terms = [x.strip('"\n') for x in header.split(',')]
 
 ## Sample use of nmf_als with A
-(W, H, errs) = nmf(A, 20, optFunc=nmf_als, maxiter=300, repetitions=1)
+(W, H, errs) = nmf(A, 20, optFunc=nmf_lns, maxiter=50, repetitions=1)
 ## To show the per-iteration error
 
 plt.plot(errs)
