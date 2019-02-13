@@ -15,11 +15,13 @@
 ## This file is meant to be run with Python3
 
 import numpy as np
+from numpy import linalg
 from numpy.linalg import svd, norm
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from scipy.stats import zscore
+
 
 ## In python, we can just write the code and it'll get called when the file is
 ## run with python3 assignment.py
@@ -27,10 +29,16 @@ from scipy.stats import zscore
 ## Task 1
 ##########
 
+
 # Function that updates W and H using ALS
-def nmf_als(A, W, H):
+def nmf_als(A, w, h):
     # ADD YOUR code to update W and H
-    return (W, H)
+    h = np.matmul(linalg.pinv(w), A)
+    h[h < 0] = 0
+    w = np.matmul(A, linalg.pinv(h))
+    w[w < 0] = 0
+    return w, h
+
 
 ## Boilerplate for NMF
 def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
@@ -43,7 +51,7 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
         errs = [np.nan] * maxiter
         for i in range(maxiter):
             (W, H) = optFunc(A, W, H)
-            currErr = norm(A - np.matmul(W, H), 'fro')**2
+            currErr = norm(A - np.matmul(W, H), 'fro') ** 2
             errs[i] = currErr
         if currErr < bestErr:
             bestErr = currErr
@@ -53,30 +61,28 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
     return (bestW, bestH, bestErrs)
 
 
-
-
 ## Load the news data
 A = np.genfromtxt('news.csv', delimiter=',', skip_header=1)
 ## To read the terms, just read the first line of news.csv
-with open('./data/news.csv') as f:
+with open('news.csv') as f:
     header = f.readline()
     terms = [x.strip('"\n') for x in header.split(',')]
 
 ## Sample use of nmf_als with A
-(W, H, errs) = nmf(A, 20, optFunc=nmf_als, maxiter=300, repetitions=1)
+(W, H, errs) = nmf(A, 20, optFunc=nmf_lns, maxiter=50, repetitions=1)
 ## To show the per-iteration error
-'''
+
 plt.plot(errs)
 plt.xlabel('Iterations')
 plt.ylabel('Squared Frobenius')
 plt.title('Convergence of NMF ALS')
 plt.show()
-'''
+
 ## IMPLEMENT the other algorithms
 ## DO the comparisons
 
 
-
+'''
 ## Task 2
 #########
 
@@ -113,3 +119,4 @@ clustering = KMeans(n_clusters=20, n_init=20).fit(KL)
 idx = clustering.labels_
 ## How good is this?
 print("NMI for KL = {}".format(nmi_news(idx)))
+'''
