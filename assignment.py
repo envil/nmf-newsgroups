@@ -33,19 +33,39 @@ from scipy.stats import zscore
 # Function that updates W and H using ALS
 def nmf_als(A, w, h):
     # ADD YOUR code to update W and H
-    h = np.matmul(linalg.pinv(w), A)
+    h = linalg.pinv(w) @ A
     h[h < 0] = 0
-    w = np.matmul(A, linalg.pinv(h))
+    w = A @ linalg.pinv(h)
     w[w < 0] = 0
     return w, h
 
 
+# Function that updates W and H using Lee and Seung multiplicative updates
 def nmf_lns(A, w, h):
-    h_denominator = np.matmul(np.matmul(np.transpose(w), w), h) + np.finfo(float).eps
-    h = h * np.matmul(np.transpose(w), A) / h_denominator
-    w_demoninator = np.matmul(np.matmul(w, h), np.transpose(h)) + np.finfo(float).eps
-    w = w * np.matmul(A, np.transpose(h)) / w_demoninator
+    h_denominator = w.T @ w @ h + np.finfo(float).eps
+    h = h * (w.T @ A) / h_denominator
+    w_denominator = w @ h @ h.T + np.finfo(float).eps
+    w = w * (A @ h.T) / w_denominator
     w = w / np.sum(w)
+    return w, h
+
+
+# Function that updates W and H using OPL gradient descent
+def nmf_opl(A, w, h):
+    iter = 10
+    WtW = w.T @ w
+    h_eta = np.diag(1 / np.sum(WtW, 1))
+    for i in range(iter):
+        G = WtW @ h - w.T @ A
+        h = h - h_eta @ G
+        h[h < 0] = 0
+
+    HHt = h @ h.T
+    w_eta = np.diag(1 / np.sum(HHt, 1))
+    for i in range(iter):
+        G = w @ HHt - A @ h.T
+        w = w - G @ w_eta
+        w[w < 0] = 0
     return w, h
 
 
@@ -78,7 +98,7 @@ with open('news.csv') as f:
     terms = [x.strip('"\n') for x in header.split(',')]
 
 ## Sample use of nmf_als with A
-(W, H, errs) = nmf(A, 20, optFunc=nmf_lns, maxiter=50, repetitions=1)
+(W, H, errs) = nmf(A, 20, optFunc=nmf_opl, maxiter=50, repetitions=1)
 ## To show the per-iteration error
 
 plt.plot(errs)
