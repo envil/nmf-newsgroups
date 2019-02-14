@@ -52,7 +52,7 @@ def nmf_lns(A, w, h):
 
 # Function that updates W and H using OPL gradient descent
 def nmf_opl(A, w, h):
-    iter = 10
+    iter = 20
     WtW = w.T @ w
     h_eta = np.diag(1 / np.sum(WtW, 1))
     for i in range(iter):
