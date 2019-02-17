@@ -147,7 +147,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
     plt.xlabel('Iterations')
     conv_ax.hist(convergence, normed=True, alpha=0.5)
     kde = stats.gaussian_kde(convergence)
-    xx = np.linspace(0, np.max(convergence), 1000)
+    xx = np.linspace(np.min(convergence), np.max(convergence), 1000)
     conv_ax.plot(xx, kde(xx))
     plt.show()
 
@@ -156,7 +156,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
     plt.xlabel('Time (ms)')
     time_ax.hist(convergence_time, density=True, alpha=0.5)
     kde = stats.gaussian_kde(convergence_time)
-    xx = np.linspace(0, np.max(convergence_time), 1000)
+    xx = np.linspace(np.min(convergence_time), np.max(convergence_time), 1000)
     time_ax.plot(xx, kde(xx))
 
     print('Finished NMF with {} repetitions of {} optimization function'.format(repetitions, name))
@@ -167,9 +167,9 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
 
 
 ## Load the news data
-A = np.genfromtxt('news_sample.csv', delimiter=',', skip_header=1)
-## To read the terms, just read the first line of news_sample.csv
-with open('news_sample.csv') as f:
+A = np.genfromtxt('news.csv', delimiter=',', skip_header=1)
+## To read the terms, just read the first line of news.csv
+with open('news.csv') as f:
     header = f.readline()
     terms = [x.strip('"\n') for x in header.split(',')]
 
@@ -178,21 +178,22 @@ test_optimize_func(A, opt_func=nmf_als, name='NMF ALS')
 test_optimize_func(A, opt_func=nmf_lns, name='NMF Lee and Seung')
 test_optimize_func(A, opt_func=nmf_opl, name='NMF OPL')
 
-'''
+
 ## Task 2
 #########
 
 ## Normalise the data before applying the NMF algorithms
-B = A/sum(sum(A)) # We're assuming Python3 here
+# B = A/sum(sum(A)) # We're assuming Python3 here
 
 ## To print the top-10 terms of the first row of H, we can do the following
-h = H[1,:]
-ind = h.argsort()[::-1][:10]
-for i in range(10): print("{}\t{}".format(terms[ind[i]], h[ind[i]]))
+# h = H[1,:]
+# ind = h.argsort()[::-1][:10]
+# for i in range(10): print("{}\t{}".format(terms[ind[i]], h[ind[i]]))
 
 ## USE NMF to analyse the data
 ## REPEAT the analysis with GKL-optimizing NMF
 
+'''
 ## Task 3
 #########
 
