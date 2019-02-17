@@ -23,6 +23,7 @@ import matplotlib.lines as mlines
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from scipy.stats import zscore
 from collections import deque
+from time import time
 
 # The percentage of construction error change that is considered no longer significant
 CONVERGENCE_THRESHOLD = 0.0005
@@ -78,8 +79,10 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
     (n, m) = A.shape
     bestErr = np.Inf
     convergence_rep = [-1] * repetitions
+    convergence_time = [0] * repetitions
     for rep in range(repetitions):
-        # Init W and H 
+        # Init W and H
+        start_time = int(time() * 1000)
         W = np.random.rand(n, k)
         H = np.random.rand(k, m)
         errs = [np.nan] * maxiter
@@ -101,7 +104,9 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
             bestH = H
             bestErrs = errs
             best_index = rep
-    return (bestW, bestH, bestErrs, convergence_rep, best_index)
+        end_time = int(time() * 1000)
+        convergence_time[rep] = end_time - start_time
+    return (bestW, bestH, bestErrs, convergence_rep, convergence_time, best_index)
 
 
 ## Load the news data
@@ -112,7 +117,9 @@ with open('news.csv') as f:
     terms = [x.strip('"\n') for x in header.split(',')]
 
 ## Sample use of nmf_als with A
-(W, H, errs, convergence, best) = nmf(A, 20, optFunc=nmf_opl, maxiter=50, repetitions=5)
+(W, H, errs, convergence, convergence_time, best) = nmf(A, 20, optFunc=nmf_opl, maxiter=50, repetitions=3)
+# print('Decomposition took {} ms'.format(end_time - start_time))
+
 ## To show the per-iteration error
 plt.plot(errs, label='Construction error')
 ax = plt.gca()
