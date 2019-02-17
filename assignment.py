@@ -19,8 +19,13 @@ from numpy import linalg
 from numpy.linalg import svd, norm
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from scipy.stats import zscore
+from collections import deque
+
+# The percentage of construction error change that is considered no longer significant
+CONVERGENCE_THRESHOLD = 0.0005
 
 
 ## In python, we can just write the code and it'll get called when the file is
@@ -28,7 +33,6 @@ from scipy.stats import zscore
 
 ## Task 1
 ##########
-
 
 # Function that updates W and H using ALS
 def nmf_als(A, w, h):
@@ -72,22 +76,32 @@ def nmf_opl(A, w, h):
 ## Boilerplate for NMF
 def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
     (n, m) = A.shape
-    bestErr = np.Inf;
+    bestErr = np.Inf
+    convergence_rep = [-1] * repetitions
     for rep in range(repetitions):
         # Init W and H 
         W = np.random.rand(n, k)
         H = np.random.rand(k, m)
         errs = [np.nan] * maxiter
-        for i in range(maxiter):
+        recent_errors = deque([np.finfo(float).max] * 5)
+        i = 0
+        while convergence_rep[rep] < 0 and i < maxiter:
             (W, H) = optFunc(A, W, H)
             currErr = norm(A - np.matmul(W, H), 'fro') ** 2
+            if abs(currErr - np.mean(recent_errors)) / currErr < CONVERGENCE_THRESHOLD \
+                    and convergence_rep[rep] < 0:
+                convergence_rep[rep] = i - 3
+            recent_errors.append(currErr)
+            recent_errors.popleft()
             errs[i] = currErr
+            i += 1
         if currErr < bestErr:
             bestErr = currErr
             bestW = W
             bestH = H
             bestErrs = errs
-    return (bestW, bestH, bestErrs)
+            best_index = rep
+    return (bestW, bestH, bestErrs, convergence_rep, best_index)
 
 
 ## Load the news data
@@ -98,13 +112,16 @@ with open('news.csv') as f:
     terms = [x.strip('"\n') for x in header.split(',')]
 
 ## Sample use of nmf_als with A
-(W, H, errs) = nmf(A, 20, optFunc=nmf_opl, maxiter=50, repetitions=1)
+(W, H, errs, convergence, best) = nmf(A, 20, optFunc=nmf_opl, maxiter=50, repetitions=5)
 ## To show the per-iteration error
-
-plt.plot(errs)
+plt.plot(errs, label='Construction error')
+ax = plt.gca()
 plt.xlabel('Iterations')
 plt.ylabel('Squared Frobenius')
 plt.title('Convergence of NMF ALS')
+l = mlines.Line2D([convergence[best], convergence[best]], [0, 100000], color='red', linestyle='--', label='Convergence')
+ax.add_line(l)
+ax.legend(loc=9)
 plt.show()
 
 ## IMPLEMENT the other algorithms
