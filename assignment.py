@@ -58,7 +58,7 @@ def nmf_lns(A, w, h):
 
 # Function that updates W and H using OPL gradient descent
 def nmf_opl(A, w, h):
-    iter = 20
+    iter = 5
     WtW = w.T @ w
     h_eta = np.diag(1 / np.sum(WtW, 1))
     for i in range(iter):
@@ -72,6 +72,16 @@ def nmf_opl(A, w, h):
         G = w @ HHt - A @ h.T
         w = w - G @ w_eta
         w[w < 0] = 0
+    return w, h
+
+
+# Function that updates W and H using General Kullback-Leibler divergence
+def nmf_gkl(A, w, h):
+    h_denominator = w.T @ (A / (w @ h + np.finfo(float).eps))
+    h = h * h_denominator/(w.T @ np.ones(np.shape(A)))
+    w_denominator = (A / (w @ h + np.finfo(float).eps)) @ h.T
+    w = w * w_denominator/(np.ones(np.shape(A)) @ h.T)
+    w = w / np.sum(w)
     return w, h
 
 
@@ -173,23 +183,32 @@ with open('news.csv') as f:
     header = f.readline()
     terms = [x.strip('"\n') for x in header.split(',')]
 
-# Comparing performance of different algorithms
-test_optimize_func(A, opt_func=nmf_als, name='NMF ALS')
-test_optimize_func(A, opt_func=nmf_lns, name='NMF Lee and Seung')
-test_optimize_func(A, opt_func=nmf_opl, name='NMF OPL')
 
+# Comparing performance of different algorithms
+# test_optimize_func(A, opt_func=nmf_als, name='NMF ALS')
+# test_optimize_func(A, opt_func=nmf_lns, name='NMF Lee and Seung')
+# test_optimize_func(A, opt_func=nmf_opl, name='NMF OPL')
+# test_optimize_func(A, opt_func=nmf_gkl, name='NMF GKL')
 
 ## Task 2
 #########
+def test_rank(B, row, k):
+    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(B, k, optFunc=nmf_als, maxiter=100,
+                                                                         repetitions=1)
+    ## To print the top-10 terms of the first row of H, we can do the following
+    h = H[row, :]
+    ind = h.argsort()[::-1][:10]
+    print('Showing top 10 terms with rank {} for row {}'.format(k, row))
+    for i in range(10): print("{}\t{}".format(terms[ind[i]], h[ind[i]]))
+    print('Error {}'.format(np.mean(errors)))
+    print('==============================')
+
 
 ## Normalise the data before applying the NMF algorithms
-# B = A/sum(sum(A)) # We're assuming Python3 here
-
-## To print the top-10 terms of the first row of H, we can do the following
-# h = H[1,:]
-# ind = h.argsort()[::-1][:10]
-# for i in range(10): print("{}\t{}".format(terms[ind[i]], h[ind[i]]))
-
+# B = A / sum(sum(A))  # We're assuming Python3 here
+# ks = [5, 14, 20, 32, 40]
+# for k in ks:
+#     test_rank(B, 1, k)
 ## USE NMF to analyse the data
 ## REPEAT the analysis with GKL-optimizing NMF
 
