@@ -26,8 +26,8 @@ from scipy import stats
 from collections import deque
 from time import time
 
-# DATA_FILE_NAME = 'news.csv'
-DATA_FILE_NAME = 'news_sample.csv'
+DATA_FILE_NAME = 'news.csv'
+# DATA_FILE_NAME = 'news_sample.csv'
 # The percentage of construction error change that is considered no longer significant
 CONVERGENCE_THRESHOLD = 0.01
 
@@ -106,7 +106,7 @@ def kl_divergence(A, W, H):
 
 
 ## Boilerplate for NMF
-def nmf(A, k, optFunc=nmf_als, errFunc=frobenius_norm, maxiter=100, repetitions=1):
+def nmf(A, k, optFunc=nmf_als, errFunc=frobenius_norm, maxiter=300, repetitions=1):
     (n, m) = A.shape
     bestErr = np.Inf
     convergence_rep_count = [-1] * repetitions
@@ -150,7 +150,7 @@ def nmf(A, k, optFunc=nmf_als, errFunc=frobenius_norm, maxiter=100, repetitions=
 def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repetitions=300, name='NMF'):
     ## Sample use of nmf_als with A
     (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(A, k, optFunc=opt_func, errFunc=errFunc,
-                                                                         maxiter=100, repetitions=repetitions)
+                                                                         repetitions=repetitions)
 
     ## To show the per-iteration error
     plt.plot(best_errs, label='Construction error')
@@ -167,8 +167,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repeti
     errors_fig, errors_ax = plt.subplots()
     plt.title('{}\'s reconstruction errors'.format(name))
     plt.xlabel('Error')
-    errors_ax.hist(errors, normed=True, alpha=0.5)
-    print(errors)
+    errors_ax.hist(errors, density=True, alpha=0.5)
     kde = stats.gaussian_kde(errors)
     xx = np.linspace(np.min(errors), np.max(errors), 1000)
     errors_ax.plot(xx, kde(xx))
@@ -177,7 +176,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repeti
     conv_fig, conv_ax = plt.subplots()
     plt.title('{}\'s Convergence Speed (number of iteration needed to converge)'.format(name))
     plt.xlabel('Iterations')
-    conv_ax.hist(convergence, normed=True, alpha=0.5)
+    conv_ax.hist(convergence, density=True, alpha=0.5)
     kde = stats.gaussian_kde(convergence)
     xx = np.linspace(np.min(convergence), np.max(convergence), 1000)
     conv_ax.plot(xx, kde(xx))
@@ -199,7 +198,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repeti
 
 
 # Comparing performance of different algorithms
-test_optimize_func(A, opt_func=nmf_als, name='NMF ALS', repetitions=50)
+test_optimize_func(A, opt_func=nmf_als, name='NMF ALS')
 test_optimize_func(A, opt_func=nmf_lns, name='NMF Lee and Seung')
 test_optimize_func(A, opt_func=nmf_opl, name='NMF OPL')
 
@@ -208,13 +207,13 @@ test_optimize_func(A, opt_func=nmf_opl, name='NMF OPL')
 print('## Task 2\n####################')
 
 
-def test_rank(B, row, k):
-    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(B, k, optFunc=nmf_als, maxiter=100,
-                                                                         repetitions=1)
+def test_rank(B, row, k, optFunc=nmf_als, errFunc=frobenius_norm, method='ALS'):
+    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(B, k, optFunc=optFunc, errFunc=errFunc,
+                                                                         maxiter=100, repetitions=1)
     ## To print the top-10 terms of the first row of H, we can do the following
     h = H[row, :]
     ind = h.argsort()[::-1][:10]
-    print('Showing top 10 terms with rank {} for row {}'.format(k, row))
+    print('Showing top 10 terms of NMF\'s {} with rank {} for row {}'.format(method, k, row))
     for i in range(10): print("{}\t{}".format(terms[ind[i]], h[ind[i]]))
     print('---------')
     print('Error {}'.format(np.mean(errors)))
@@ -224,8 +223,10 @@ def test_rank(B, row, k):
 ## Normalise the data before applying the NMF algorithms
 B = A / sum(sum(A))  # We're assuming Python3 here
 ks = [5, 14, 20, 32, 40]
-# for k in ks:
-# test_rank(B, 1, k)
+for k in ks:
+    test_rank(B, 1, k)
+for k in ks:
+    test_rank(B, 1, k, optFunc=nmf_gkl, errFunc=kl_divergence, method='GKL')
 # USE NMF to analyse the data
 # REPEAT the analysis with GKL-optimizing NMF
 
