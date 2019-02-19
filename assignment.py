@@ -26,15 +26,27 @@ from scipy import stats
 from collections import deque
 from time import time
 
+DATA_FILE_NAME = 'news.csv'
+# DATA_FILE_NAME = 'news_sample.csv'
 # The percentage of construction error change that is considered no longer significant
 CONVERGENCE_THRESHOLD = 0.01
-
 
 ## In python, we can just write the code and it'll get called when the file is
 ## run with python3 assignment.py
 
+
+## Load the news data
+print('Loading {}...'.format(DATA_FILE_NAME))
+A = np.genfromtxt(DATA_FILE_NAME, delimiter=',', skip_header=1)
+## To read the terms, just read the first line of news.csv
+with open(DATA_FILE_NAME) as f:
+    header = f.readline()
+    terms = [x.strip('"\n') for x in header.split(',')]
+
 ## Task 1
 ##########
+print('## Task 1\n####################')
+
 
 # Function that updates W and H using ALS
 def nmf_als(A, w, h):
@@ -58,7 +70,7 @@ def nmf_lns(A, w, h):
 
 # Function that updates W and H using OPL gradient descent
 def nmf_opl(A, w, h):
-    iter = 20
+    iter = 5
     WtW = w.T @ w
     h_eta = np.diag(1 / np.sum(WtW, 1))
     for i in range(iter):
@@ -75,14 +87,33 @@ def nmf_opl(A, w, h):
     return w, h
 
 
+# Function that updates W and H using General Kullback-Leibler divergence
+def nmf_gkl(A, w, h):
+    h_denominator = w.T @ (A / (w @ h + np.finfo(float).eps))
+    h = h * h_denominator / (w.T @ np.ones(np.shape(A)))
+    w_denominator = (A / (w @ h + np.finfo(float).eps)) @ h.T
+    w = w * w_denominator / (np.ones(np.shape(A)) @ h.T)
+    w = w / np.sum(w, axis=0)
+    return w, h
+
+
+def frobenius_norm(A, W, H):
+    return norm(A - np.matmul(W, H), 'fro') ** 2
+
+
+def kl_divergence(A, W, H):
+    return np.sum(A * np.log((A / (W @ H + np.finfo(float).eps)) + np.finfo(float).eps) - A + W @ H)
+
+
 ## Boilerplate for NMF
-def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
+def nmf(A, k, optFunc=nmf_als, errFunc=frobenius_norm, maxiter=300, repetitions=1):
     (n, m) = A.shape
     bestErr = np.Inf
-    convergence_rep = [-1] * repetitions
+    convergence_rep_count = [-1] * repetitions
     convergence_time = [0] * repetitions
     errors = [np.finfo(float).max] * repetitions
     for rep in range(repetitions):
+        # print('Current rep: {}'.format(rep))
         # Init W and H
         start_time = int(time() * 1000)
         W = np.random.rand(n, k)
@@ -90,19 +121,20 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
         errs = [np.nan] * maxiter
         recent_errors = deque([np.finfo(float).max] * 5)
         i = 0
-        while convergence_rep[rep] < 0 and i < maxiter:
+        while convergence_rep_count[rep] < 0 and i < maxiter:
+            # print('i: {}, currErr: {}'.format(i, currErr))
             (W, H) = optFunc(A, W, H)
-            currErr = norm(A - np.matmul(W, H), 'fro') ** 2
+            currErr = errFunc(A, W, H)
             if abs(currErr - np.mean(recent_errors)) / currErr < CONVERGENCE_THRESHOLD \
-                    and convergence_rep[rep] < 0:
-                convergence_rep[rep] = i - 3
+                    and convergence_rep_count[rep] < 0:
+                convergence_rep_count[rep] = i - 3
                 errors[rep] = currErr
             recent_errors.append(currErr)
             recent_errors.popleft()
             errs[i] = currErr
             i += 1
-        if convergence_rep[rep] < 0:
-            convergence_rep[rep] = maxiter
+        if convergence_rep_count[rep] < 0:
+            convergence_rep_count[rep] = maxiter
             errors[rep] = errs.pop()
         if currErr < bestErr:
             bestErr = currErr
@@ -112,12 +144,12 @@ def nmf(A, k, optFunc=nmf_als, maxiter=300, repetitions=1):
             best_index = rep
         end_time = int(time() * 1000)
         convergence_time[rep] = end_time - start_time
-    return (bestW, bestH, errors, convergence_rep, convergence_time, bestErrs, best_index)
+    return (bestW, bestH, errors, convergence_rep_count, convergence_time, bestErrs, best_index)
 
 
-def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
+def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repetitions=300, name='NMF'):
     ## Sample use of nmf_als with A
-    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(A, k, optFunc=opt_func, maxiter=100,
+    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(A, k, optFunc=opt_func, errFunc=errFunc,
                                                                          repetitions=repetitions)
 
     ## To show the per-iteration error
@@ -135,8 +167,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
     errors_fig, errors_ax = plt.subplots()
     plt.title('{}\'s reconstruction errors'.format(name))
     plt.xlabel('Error')
-    errors_ax.hist(errors, normed=True, alpha=0.5)
-    print(errors)
+    errors_ax.hist(errors, density=True, alpha=0.5)
     kde = stats.gaussian_kde(errors)
     xx = np.linspace(np.min(errors), np.max(errors), 1000)
     errors_ax.plot(xx, kde(xx))
@@ -145,7 +176,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
     conv_fig, conv_ax = plt.subplots()
     plt.title('{}\'s Convergence Speed (number of iteration needed to converge)'.format(name))
     plt.xlabel('Iterations')
-    conv_ax.hist(convergence, normed=True, alpha=0.5)
+    conv_ax.hist(convergence, density=True, alpha=0.5)
     kde = stats.gaussian_kde(convergence)
     xx = np.linspace(np.min(convergence), np.max(convergence), 1000)
     conv_ax.plot(xx, kde(xx))
@@ -156,8 +187,8 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
     plt.xlabel('Time (ms)')
     time_ax.hist(convergence_time, density=True, alpha=0.5)
     kde = stats.gaussian_kde(convergence_time)
-    xx = np.linspace(np.min(convergence_time), np.max(convergence_time), 1000)
-    time_ax.plot(xx, kde(xx))
+    x_lin = np.linspace(np.min(convergence_time), np.max(convergence_time), 1000)
+    time_ax.plot(x_lin, kde(x_lin))
 
     print('Finished NMF with {} repetitions of {} optimization function'.format(repetitions, name))
     print('Average reconstruction errors: {}'.format(np.mean(errors)))
@@ -166,54 +197,73 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, repetitions=100, name='NMF'):
     plt.show()
 
 
-## Load the news data
-A = np.genfromtxt('news.csv', delimiter=',', skip_header=1)
-## To read the terms, just read the first line of news.csv
-with open('news.csv') as f:
-    header = f.readline()
-    terms = [x.strip('"\n') for x in header.split(',')]
-
 # Comparing performance of different algorithms
 test_optimize_func(A, opt_func=nmf_als, name='NMF ALS')
 test_optimize_func(A, opt_func=nmf_lns, name='NMF Lee and Seung')
 test_optimize_func(A, opt_func=nmf_opl, name='NMF OPL')
 
-
 ## Task 2
 #########
+print('## Task 2\n####################')
+
+
+def test_rank(B, row, k, optFunc=nmf_als, errFunc=frobenius_norm, method='ALS'):
+    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(B, k, optFunc=optFunc, errFunc=errFunc,
+                                                                         maxiter=100, repetitions=1)
+    ## To print the top-10 terms of the first row of H, we can do the following
+    h = H[row, :]
+    ind = h.argsort()[::-1][:10]
+    print('Showing top 10 terms of NMF\'s {} with rank {} for row {}'.format(method, k, row))
+    for i in range(10): print("{}\t{}".format(terms[ind[i]], h[ind[i]]))
+    print('---------')
+    print('Error {}'.format(np.mean(errors)))
+    print('==============================')
+
 
 ## Normalise the data before applying the NMF algorithms
-# B = A/sum(sum(A)) # We're assuming Python3 here
+B = A / sum(sum(A))  # We're assuming Python3 here
+ks = [5, 14, 20, 32, 40]
+for k in ks:
+    test_rank(B, 1, k)
+for k in ks:
+    test_rank(B, 1, k, optFunc=nmf_gkl, errFunc=kl_divergence, method='GKL')
+# USE NMF to analyse the data
+# REPEAT the analysis with GKL-optimizing NMF
 
-## To print the top-10 terms of the first row of H, we can do the following
-# h = H[1,:]
-# ind = h.argsort()[::-1][:10]
-# for i in range(10): print("{}\t{}".format(terms[ind[i]], h[ind[i]]))
-
-## USE NMF to analyse the data
-## REPEAT the analysis with GKL-optimizing NMF
-
-'''
+# test_optimize_func(B, opt_func=nmf_gkl, errFunc=kl_divergence, name='NMF GKL', repetitions=4)
 ## Task 3
 #########
+print('## Task 3\n####################')
+
 
 ## In Python, we can compute a slightly different normalized mutual information using scikit-learn's normalized_mutual_info_score (imported as nmi)
+
+
 def nmi_news(x):
     gd = np.loadtxt('news_ground_truth.txt')
     return 1 - nmi(x, gd)
+
+
+def test_clustering(A, name, n_clusters=20):
+    clustering = KMeans(n_clusters=n_clusters, n_init=20).fit(A)
+    idx = clustering.labels_
+    ## How good is this?
+    print("NMI for {} = {}".format(name, nmi_news(idx)))
+
 
 ## We can compute Karhunen-Loeve 'manually'
 Z = zscore(A)
 U, S, V = svd(Z, full_matrices=False)
 V.transpose()
-V = V[0:20,:]
-KL = np.matmul(Z, V.transpose())
+V = V[0:20, :]
+KL = Z @ V.T
 
 ## COMPUTE pLSA with the matrix B from the previous task
+test_clustering(B, 'k-mean')
+test_clustering(KL, 'KL')
 
-# Clustering the KL matrix
-clustering = KMeans(n_clusters=20, n_init=20).fit(KL)
-idx = clustering.labels_
-## How good is this?
-print("NMI for KL = {}".format(nmi_news(idx)))
-'''
+ks = [5, 14, 20, 32, 40]
+for k in ks:
+    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(B, k, optFunc=nmf_gkl, errFunc=kl_divergence,
+                                                                         maxiter=100, repetitions=1)
+    test_clustering(W, 'NMF of rank {}'.format(k), n_clusters=k)
