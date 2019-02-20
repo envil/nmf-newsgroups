@@ -27,7 +27,6 @@ from collections import deque
 from time import time
 
 DATA_FILE_NAME = 'news.csv'
-# DATA_FILE_NAME = 'news_sample.csv'
 # The percentage of construction error change that is considered no longer significant
 CONVERGENCE_THRESHOLD = 0.01
 
@@ -50,7 +49,6 @@ print('## Task 1\n####################')
 
 # Function that updates W and H using ALS
 def nmf_als(A, w, h):
-    # ADD YOUR code to update W and H
     h = linalg.pinv(w) @ A
     h[h < 0] = 0
     w = A @ linalg.pinv(h)
@@ -87,12 +85,34 @@ def nmf_opl(A, w, h):
     return w, h
 
 
-# Function that updates W and H using General Kullback-Leibler divergence
+# Function that updates W and H using Generalized Kullback-Leibler divergence
 def nmf_gkl(A, w, h):
-    h_denominator = w.T @ (A / (w @ h + np.finfo(float).eps))
-    h = h * h_denominator / (w.T @ np.ones(np.shape(A)))
-    w_denominator = (A / (w @ h + np.finfo(float).eps)) @ h.T
-    w = w * w_denominator / (np.ones(np.shape(A)) @ h.T)
+    WH = w @ h
+    WH[WH == 0] = np.finfo(float).eps
+    h_numerator = w.T @ (A / WH)
+    h = h * h_numerator / (w.T @ np.ones(np.shape(A)))
+    w_numerator = (A / WH) @ h.T
+    w = w * w_numerator / (np.ones(np.shape(A)) @ h.T)
+    w = w / np.sum(w, axis=0)
+    return w, h
+
+
+# Function that updates W and H using Generalized Kullback-Leibler divergence.
+# This is straight implementation from the slide, though the performance is very bad.
+def nmf_gkl_vanila(A, w, h):
+    (N, M) = np.shape(A)
+    (N, K) = np.shape(w)
+    WH = w @ h
+    WH[WH == 0] = np.finfo(float).eps
+    A_over_WH = A / WH
+    # updating H
+    for k in range(K):
+        for j in range(M):
+            h[k, j] *= sum(w[:, k] * A_over_WH[:, j]) / sum(w[:, k])
+    # updating W
+    for k in range(K):
+        for i in range(N):
+            w[i, k] *= sum(A_over_WH[i, :] * h[k, :]) / sum(h[k, :])
     w = w / np.sum(w, axis=0)
     return w, h
 
@@ -113,18 +133,18 @@ def nmf(A, k, optFunc=nmf_als, errFunc=frobenius_norm, maxiter=300, repetitions=
     convergence_time = [0] * repetitions
     errors = [np.finfo(float).max] * repetitions
     for rep in range(repetitions):
-        # print('Current rep: {}'.format(rep))
         # Init W and H
         start_time = int(time() * 1000)
         W = np.random.rand(n, k)
         H = np.random.rand(k, m)
         errs = [np.nan] * maxiter
+        # recent errors for tracking the convergence
         recent_errors = deque([np.finfo(float).max] * 5)
         i = 0
         while convergence_rep_count[rep] < 0 and i < maxiter:
-            # print('i: {}, currErr: {}'.format(i, currErr))
             (W, H) = optFunc(A, W, H)
             currErr = errFunc(A, W, H)
+            # check if the convergence is reached
             if abs(currErr - np.mean(recent_errors)) / currErr < CONVERGENCE_THRESHOLD \
                     and convergence_rep_count[rep] < 0:
                 convergence_rep_count[rep] = i - 3
@@ -149,16 +169,16 @@ def nmf(A, k, optFunc=nmf_als, errFunc=frobenius_norm, maxiter=300, repetitions=
 
 def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repetitions=300, name='NMF'):
     ## Sample use of nmf_als with A
-    (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(A, k, optFunc=opt_func, errFunc=errFunc,
-                                                                         repetitions=repetitions)
+    (W, H, errors, convergence, convergence_time, best_errs, best_index) = nmf(A, k, optFunc=opt_func, errFunc=errFunc,
+                                                                               repetitions=repetitions)
 
     ## To show the per-iteration error
-    plt.plot(best_errs, label='Construction error')
+    plt.plot(best_errs, label='Reconstruction error')
     ax = plt.gca()
     plt.xlabel('Iterations')
     plt.ylabel('Squared Frobenius')
     plt.title('Convergence of {}'.format(name))
-    l = mlines.Line2D([convergence[best], convergence[best]], [0, 100000], color='red', linestyle='--',
+    l = mlines.Line2D([convergence[best_index], convergence[best_index]], [0, 100000], color='red', linestyle='--',
                       label='Convergence')
     ax.add_line(l)
     ax.legend(loc=9)
@@ -169,21 +189,21 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repeti
     plt.xlabel('Error')
     errors_ax.hist(errors, density=True, alpha=0.5)
     kde = stats.gaussian_kde(errors)
-    xx = np.linspace(np.min(errors), np.max(errors), 1000)
-    errors_ax.plot(xx, kde(xx))
+    x_lin = np.linspace(np.min(errors), np.max(errors), 1000)
+    errors_ax.plot(x_lin, kde(x_lin))
     plt.show()
 
     conv_fig, conv_ax = plt.subplots()
-    plt.title('{}\'s Convergence Speed (number of iteration needed to converge)'.format(name))
+    plt.title('{}\'s Convergence Iteration Count Distribution'.format(name))
     plt.xlabel('Iterations')
     conv_ax.hist(convergence, density=True, alpha=0.5)
     kde = stats.gaussian_kde(convergence)
-    xx = np.linspace(np.min(convergence), np.max(convergence), 1000)
-    conv_ax.plot(xx, kde(xx))
+    x_lin = np.linspace(np.min(convergence), np.max(convergence), 1000)
+    conv_ax.plot(x_lin, kde(x_lin))
     plt.show()
 
     time_fig, time_ax = plt.subplots()
-    plt.title('{}\'s Convergence Time (time needed to converge)'.format(name))
+    plt.title('{}\'s Convergence Time Distribution'.format(name))
     plt.xlabel('Time (ms)')
     time_ax.hist(convergence_time, density=True, alpha=0.5)
     kde = stats.gaussian_kde(convergence_time)
@@ -192,7 +212,7 @@ def test_optimize_func(A, k=20, opt_func=nmf_als, errFunc=frobenius_norm, repeti
 
     print('Finished NMF with {} repetitions of {} optimization function'.format(repetitions, name))
     print('Average reconstruction errors: {}'.format(np.mean(errors)))
-    print('Average convergence speed: {}'.format(np.mean(convergence)))
+    print('Average number of iterations needed to convergence: {}'.format(np.mean(convergence)))
     print('Average convergence time (ms): {}'.format(np.mean(convergence_time)))
     plt.show()
 
@@ -222,15 +242,15 @@ def test_rank(B, row, k, optFunc=nmf_als, errFunc=frobenius_norm, method='ALS'):
 
 ## Normalise the data before applying the NMF algorithms
 B = A / sum(sum(A))  # We're assuming Python3 here
-ks = [5, 14, 20, 32, 40]
-for k in ks:
-    test_rank(B, 1, k)
-for k in ks:
-    test_rank(B, 1, k, optFunc=nmf_gkl, errFunc=kl_divergence, method='GKL')
+K = [5, 14, 20, 32, 40]
 # USE NMF to analyse the data
-# REPEAT the analysis with GKL-optimizing NMF
+for k in K:
+    test_rank(B, 1, k)
 
-# test_optimize_func(B, opt_func=nmf_gkl, errFunc=kl_divergence, name='NMF GKL', repetitions=4)
+# REPEAT the analysis with GKL-optimizing NMF
+for k in K:
+    test_rank(B, 1, k, optFunc=nmf_gkl, errFunc=kl_divergence, method='GKL')
+
 ## Task 3
 #########
 print('## Task 3\n####################')
@@ -262,8 +282,7 @@ KL = Z @ V.T
 test_clustering(B, 'k-mean')
 test_clustering(KL, 'KL')
 
-ks = [5, 14, 20, 32, 40]
-for k in ks:
+for k in K:
     (W, H, errors, convergence, convergence_time, best_errs, best) = nmf(B, k, optFunc=nmf_gkl, errFunc=kl_divergence,
                                                                          maxiter=100, repetitions=1)
     test_clustering(W, 'NMF of rank {}'.format(k), n_clusters=k)
